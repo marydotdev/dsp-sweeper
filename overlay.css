@@ -1,0 +1,288 @@
+/* =============================================
+   DSP Sweeper — Overlay CSS
+   Toolbar + add popover + detail panel + tooltips
+   ============================================= */
+
+/* ---- TOOLBAR ---- */
+#bbdr-toolbar {
+  position: fixed; bottom: 12px; right: 12px;
+  display: flex; align-items: center; gap: 10px;
+  background: #1a1a1a; color: #d4dae3;
+  font-family: sans-serif;
+  font-size: 13px; line-height: 1;
+  border: 1px solid #333; border-radius: 10px;
+  padding: 8px 14px;
+  z-index: 100000;
+  box-shadow: 0 4px 24px rgba(0,0,0,.5);
+  user-select: none;
+}
+
+/* Reset button */
+.bt-reset {
+  background: none; border: none;
+  color: #888; cursor: pointer;
+  font-size: 16px; line-height: 1;
+  padding: 0 2px;
+  transition: color .15s;
+}
+.bt-reset:hover { color: #ef4444; }
+
+/* Divider between reset and dots */
+.bt-divider {
+  width: 1px; height: 18px;
+  background: #333;
+  flex-shrink: 0;
+}
+
+/* Dot legend row */
+.bt-dots {
+  display: flex; align-items: center; gap: 6px;
+}
+.bt-dot {
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform .1s, box-shadow .15s;
+  flex-shrink: 0;
+}
+.bt-dot:hover { transform: scale(1.2); }
+.bt-dot-selected {
+  box-shadow: 0 0 0 2px #1a1a1a, 0 0 0 4px rgba(255,255,255,.6);
+}
+
+/* Action buttons */
+.bt-actions {
+  display: flex; gap: 4px;
+}
+.bt-btn {
+  width: 28px; height: 28px;
+  background: #252525; border: 1px solid #333; border-radius: 6px;
+  color: #aaa; cursor: pointer;
+  font-family: inherit; font-size: 15px;
+  display: flex; align-items: center; justify-content: center;
+  transition: color .15s, border-color .15s;
+}
+.bt-btn:hover { color: #f59e0b; border-color: #f59e0b55; }
+.bt-btn.active { color: #f59e0b; border-color: #f59e0b; background: #2a2508; }
+.bt-btn.has-badge { position: relative; }
+.bt-btn.has-badge::after {
+  content: attr(data-count);
+  position: absolute; top: -5px; right: -5px;
+  background: #ef4444; color: #fff;
+  font-size: 9px; font-weight: 700;
+  width: 16px; height: 16px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
+.bt-btn.btn-disabled {
+  color: #444; cursor: default;
+  border-color: #2a2a2a;
+}
+.bt-btn.btn-disabled:hover {
+  color: #444; border-color: #2a2a2a;
+}
+
+/* Empty state */
+.bt-empty {
+  color: #777; font-size: 12px;
+}
+
+/* ---- DOT TOOLTIP (toolbar hover) ---- */
+#bbdr-dot-tip {
+  position: fixed;
+  background: #1a1a1a;
+  color: #d4dae3;
+  font-family: sans-serif;
+  font-size: 12px; line-height: 1.5;
+  border: 1px solid #333; border-radius: 8px;
+  padding: 8px 12px;
+  pointer-events: none;
+  z-index: 100002;
+  min-width: 120px; max-width: 280px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.6);
+}
+.dt-name {
+  font-weight: 700; font-size: 13px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ---- ADD POPOVER ---- */
+#bbdr-popover {
+  position: fixed; bottom: 56px; right: 12px;
+  width: 290px; max-height: 360px;
+  background: #1a1a1a; color: #d4dae3;
+  font-family: sans-serif;
+  font-size: 13px; line-height: 1.5;
+  border: 1px solid #333; border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.6);
+  z-index: 100001;
+  overflow-y: auto; overflow-x: hidden;
+  padding: 12px 14px;
+}
+#bbdr-popover::-webkit-scrollbar { width: 4px; }
+#bbdr-popover::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+#bbdr-popover::-webkit-scrollbar-track { background: transparent; }
+
+/* Popover header */
+.po-hdr {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
+  color: #8a8f98; margin-bottom: 10px;
+}
+
+/* Popover empty */
+.po-empty {
+  color: #777; font-size: 12px;
+  padding: 8px 0;
+}
+
+/* Candidate rows */
+.po-cand {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 0;
+  border-bottom: 1px solid #2a2a2a;
+}
+.po-cand:last-child { border-bottom: none; }
+.po-cand-info {
+  display: flex; align-items: baseline; gap: 6px;
+  min-width: 0; flex: 1;
+}
+.po-cand-name {
+  font-weight: 600; color: #eee; font-size: 13px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 130px;
+}
+.po-cand-routes {
+  font-size: 11px; color: #8a8f98;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.po-cand-actions { display: flex; gap: 4px; flex-shrink: 0; margin-left: 8px; }
+.po-btn-yes, .po-btn-no {
+  width: 26px; height: 24px;
+  border-radius: 4px; border: 1px solid;
+  cursor: pointer; font-size: 13px; font-family: inherit;
+  display: flex; align-items: center; justify-content: center;
+}
+.po-btn-yes {
+  background: #10b98118; border-color: #10b98140; color: #10b981;
+}
+.po-btn-yes:hover { background: #10b98130; border-color: #10b981; }
+.po-btn-no {
+  background: #ef444412; border-color: #ef444433; color: #ef4444;
+}
+.po-btn-no:hover { background: #ef444422; border-color: #ef4444; }
+
+/* ---- DETAIL PANEL ---- */
+#bbdr-detail {
+  position: fixed; bottom: 56px; right: 12px;
+  width: 320px; max-height: 420px;
+  background: #2d2d2d; color: #d4dae3;
+  font-family: sans-serif;
+  font-size: 13px; line-height: 1.5;
+  border: 1px solid #3a3a3a; border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.5);
+  z-index: 100001;
+  overflow-y: auto; overflow-x: hidden;
+}
+#bbdr-detail::-webkit-scrollbar { width: 4px; }
+#bbdr-detail::-webkit-scrollbar-thumb { background: #444; border-radius: 2px; }
+#bbdr-detail::-webkit-scrollbar-track { background: transparent; }
+
+.dp-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px 12px;
+}
+.dp-header-left {
+  display: flex; align-items: center; gap: 10px;
+  min-width: 0; flex: 1;
+}
+.dp-color-dot {
+  width: 12px; height: 12px;
+  border-radius: 50%; flex-shrink: 0;
+}
+.dp-name {
+  font-weight: 700; font-size: 15px; color: #f0f0f0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  min-width: 0;
+}
+.dp-header-right {
+  display: flex; align-items: center; gap: 6px;
+  flex-shrink: 0;
+}
+.dp-delete {
+  background: none; border: none;
+  color: #777; cursor: pointer;
+  line-height: 1;
+  padding: 2px;
+  transition: color .15s;
+  display: flex; align-items: center;
+}
+.dp-delete:hover { color: #ef4444; }
+.dp-delete svg { width: 14px; height: 14px; }
+.dp-close {
+  background: none; border: none;
+  color: #888; cursor: pointer;
+  font-size: 20px; line-height: 1;
+  padding: 0 2px;
+  transition: color .15s;
+}
+.dp-close:hover { color: #eee; }
+
+/* Detail row */
+.dp-row {
+  padding: 12px 16px;
+  border-top: 1px solid #3a3a3a;
+}
+.dp-row-active {
+  border-left: 3px solid #3498DB;
+  padding-left: 13px;
+}
+.dp-row-top {
+  display: flex; align-items: baseline; gap: 10px;
+}
+.dp-route {
+  color: #e0e0e0; font-weight: 600; font-size: 13px;
+  flex-shrink: 0;
+}
+.dp-driver {
+  color: #9ca3af; font-size: 13px;
+  flex: 1;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.dp-stops {
+  color: #f0f0f0; font-size: 14px; font-weight: 600;
+  white-space: nowrap;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.dp-row-bottom {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 4px;
+}
+.dp-time {
+  color: #8a8f98; font-size: 11px;
+}
+.dp-active-badge {
+  font-size: 9px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .5px;
+  color: #3498DB;
+  background: rgba(52, 152, 219, .15);
+  padding: 2px 6px;
+  border-radius: 3px;
+  line-height: 1;
+}
+
+/* ---- MAP TOOLTIP ---- */
+#bbdr-tip {
+  position: fixed;
+  background: rgba(26, 26, 26, .95);
+  color: #e2e8f0;
+  font-family: sans-serif;
+  font-size: 12px; line-height: 1.5;
+  border: 1px solid #333; border-radius: 6px;
+  padding: 6px 10px;
+  pointer-events: none;
+  z-index: 100002;
+  max-width: 280px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.4);
+}
+.tip-name { font-weight: 700; color: #f0f4f8; overflow: hidden; text-overflow: ellipsis; }
+.tip-detail { color: #9ca3af; overflow: hidden; text-overflow: ellipsis; }
