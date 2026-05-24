@@ -21,6 +21,7 @@
     dismissedHelpers: [],        // rejected transporter IDs
     activePopover: null,         // null | 'add'
     activeDetailPanel: null,     // transporterId of sweeper whose detail panel is open
+    colorPickerOpen: false,      // whether the color swatch row is shown in the detail panel
 
     // Derived (recomputed on each API update)
     detectedHelpers: [],         // auto-detected from multi-transporter routes
@@ -801,7 +802,7 @@
     // Header
     html += `<div class="dp-header">`;
     html += `<div class="dp-header-left">`;
-    html += `<span class="dp-color-dot" style="background:${color}"></span>`;
+    html += `<span class="dp-color-dot" style="background:${color}" data-act="toggle-colors" title="Change color"></span>`;
     html += `<span class="dp-name">${sw.name}</span>`;
     html += `</div>`;
     html += `<div class="dp-header-right">`;
@@ -809,6 +810,16 @@
     html += `<button class="dp-close" data-act="close-detail" title="Close">&times;</button>`;
     html += `</div>`;
     html += `</div>`;
+
+    if (state.colorPickerOpen) {
+      html += `<div class="dp-color-picker">`;
+      for (let i = 0; i < SWEEPER_COLORS.length; i++) {
+        const c = SWEEPER_COLORS[i];
+        const activeClass = sw.colorIndex === i ? ' dp-swatch-active' : '';
+        html += `<button class="dp-swatch${activeClass}" style="background:${c}" data-act="set-color" data-color-idx="${i}" title="Use this color"></button>`;
+      }
+      html += `</div>`;
+    }
 
     const cw = sw.currentWith;
     const isActive = cw && cw.completedStops < cw.totalStops;
@@ -933,7 +944,7 @@
     if (e.target.closest('#bbdr-toolbar') || e.target.closest('#bbdr-popover') || e.target.closest('#bbdr-detail')) return;
     let changed = false;
     if (state.activePopover != null) { state.activePopover = null; changed = true; }
-    if (state.activeDetailPanel != null) { state.activeDetailPanel = null; changed = true; }
+    if (state.activeDetailPanel != null) { state.activeDetailPanel = null; state.colorPickerOpen = false; changed = true; }
     if (changed) render();
   });
 
@@ -1009,6 +1020,7 @@
         const sw = state.sweepers[+data.i];
         if (!sw || !sw.transporterId) return;
         state.activePopover = null;
+        state.colorPickerOpen = false;
         hideDotTooltip();
         if (state.activeDetailPanel === sw.transporterId) {
           state.activeDetailPanel = null;
@@ -1021,14 +1033,37 @@
 
       case 'close-detail':
         state.activeDetailPanel = null;
+        state.colorPickerOpen = false;
         render();
         break;
+
+      case 'toggle-colors':
+        state.colorPickerOpen = !state.colorPickerOpen;
+        render();
+        break;
+
+      case 'set-color': {
+        const sw = state.sweepers.find(s => s.transporterId === state.activeDetailPanel);
+        if (!sw) return;
+        const newIdx = +data.colorIdx;
+        if (sw.colorIndex !== newIdx) {
+          const other = state.sweepers.find(s => s !== sw && s.colorIndex === newIdx);
+          if (other) other.colorIndex = sw.colorIndex;
+          sw.colorIndex = newIdx;
+          persist();
+          highlightSweeperMarkers();
+        }
+        state.colorPickerOpen = false;
+        render();
+        break;
+      }
 
       case 'remove-sw': {
         const sw = state.sweepers.find(s => s.transporterId === data.tid);
         if (sw && confirm(`Remove ${sw.name}?`)) {
           state.sweepers = state.sweepers.filter(s => s.transporterId !== data.tid);
           state.activeDetailPanel = null;
+          state.colorPickerOpen = false;
           delete state.sweeperRouteData[data.tid];
           persist();
           highlightSweeperMarkers();
@@ -1043,6 +1078,7 @@
           state.dismissedHelpers = [];
           state.activePopover = null;
           state.activeDetailPanel = null;
+          state.colorPickerOpen = false;
           state.sweeperRouteData = {};
           persist();
           hideDotTooltip();

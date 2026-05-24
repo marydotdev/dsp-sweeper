@@ -5,19 +5,21 @@
 Chrome extension that adds a sweeper tracking overlay onto the Amazon Logistics Cortex route execution page. It:
 
 - **Colors sweeper markers on the map** — each sweeper gets a distinct color applied to their Mapbox marker so you can spot them at a glance
+- **Customizable colors** — pick from an 8-color palette per sweeper; colors stay unique across sweepers
 - **Auto-detects helpers** — routes with multiple transporters are flagged as potential sweeper candidates
 - **Tracks sweeper movement** — see which route a sweeper is currently on, how many stops they've done, and their history throughout the day
 - **Map tooltips** — hover over a colored marker to see the sweeper's name, current route, driver, and stop progress
 
 ## Install
 
-1. Download or clone this folder
+Install from the Chrome Web Store, then open `https://logistics.amazon.com/operations/execution/dv/routes`. The toolbar appears at the bottom-right of the screen.
+
+### Developer install (unpacked)
+
+1. Clone this folder
 2. Open Chrome and go to `chrome://extensions/`
 3. Enable **Developer mode** (toggle in the top-right)
 4. Click **Load unpacked** and select this folder
-5. Navigate to `https://logistics.amazon.com/operations/execution/dv/routes`
-
-The toolbar appears at the bottom-right of the screen.
 
 ## Usage
 
@@ -26,6 +28,9 @@ When the extension detects helpers on multi-transporter routes, the **+** button
 
 ### Viewing Sweeper Details
 Click any colored dot in the toolbar to open the detail panel showing the sweeper's current route and history.
+
+### Changing a Sweeper's Color
+In the detail panel, click the colored dot next to the sweeper's name to reveal the palette, then pick a swatch. If another sweeper already uses that color, the two will swap so colors remain unique.
 
 ### Reset
 Click the reset icon on the left side of the toolbar to clear all sweeper data. Data auto-resets each day.
