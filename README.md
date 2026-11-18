@@ -33,7 +33,13 @@ Click any colored dot in the toolbar to open the detail panel showing the sweepe
 In the detail panel, click the colored dot next to the sweeper's name to reveal the palette, then pick a swatch. If another sweeper already uses that color, the two will swap so colors remain unique.
 
 ### Reset
-Click the reset icon on the left side of the toolbar to clear all sweeper data. Data auto-resets each day.
+Click the reset icon on the left side of the toolbar to clear all sweeper data. Data auto-resets at midnight (your computer's local time), including in tabs left open overnight.
+
+### Extension Icon
+Click the DSP Sweeper icon in Chrome's toolbar:
+- **On the routes page** — shows or hides the sweeper toolbar (remembered across reloads)
+- **Elsewhere in Cortex** — goes to the routes page
+- **On any other site** — opens the routes page in a new tab
 
 ## Testing
 
@@ -46,10 +52,12 @@ Click the reset icon on the left side of the toolbar to clear all sweeper data. 
 ### Check it in Cortex
 1. Open `https://logistics.amazon.com/operations/execution/dv/routes` (reload if it was already open).
 2. Confirm the toolbar appears and sweepers are tracked as before.
+   - Also start on another Cortex page and click through to the routes page — the toolbar should appear without a refresh.
 3. Change a sweeper's color — their pin on the map should switch to that color.
 4. Hover a sweeper's pin — the tooltip should show their name, route, driver, and stop progress.
 5. Change a color, then pan or zoom the map — the pin should keep its new color.
 6. Reload the page — color choices should persist.
+7. Click the extension icon — the toolbar should hide; click again to bring it back. From another site, the icon should open the routes page.
 
 ### Troubleshooting
 - Open the console on the Cortex page (Cmd+Option+J) and look for errors from `content.js`, `intercept.js`, or `mapcolor.js`.
@@ -60,6 +68,7 @@ Click the reset icon on the left side of the toolbar to clear all sweeper data. 
 ```
 dsp-sweeper/
 ├── manifest.json     # Extension config (Manifest V3)
+├── background.js     # Toolbar icon click handler (service worker)
 ├── content.js        # Main logic — tracking, UI, marker highlighting
 ├── intercept.js      # API response interceptor (runs in MAIN world)
 ├── mapcolor.js       # Recolors sweeper pins on the map, reports hovers (MAIN world)
@@ -73,5 +82,6 @@ dsp-sweeper/
 ## Permissions
 
 - **storage** — persist sweeper data across page refreshes
+- **activeTab** — read the current tab's URL when the toolbar icon is clicked
 
-Content scripts run only on `https://logistics.amazon.com/operations/execution/dv/routes*`.
+Content scripts are injected on `https://logistics.amazon.com/*` (Cortex is a single-page app, so the routes page can be reached without a page load), but the overlay only appears on `/operations/execution/dv/routes`.

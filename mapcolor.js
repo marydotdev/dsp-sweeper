@@ -127,10 +127,10 @@
     return true;
   }
 
-  // maplibregl loads after document_start, so poll for it
+  // maplibregl loads after document_start, and may only load once the user
+  // navigates to the routes page within Cortex, so keep polling until it appears
   if (!hookLib(window.maplibregl)) {
-    const iv = setInterval(() => { if (hookLib(window.maplibregl)) clearInterval(iv); }, 250);
-    setTimeout(() => clearInterval(iv), 120000);
+    const iv = setInterval(() => { if (hookLib(window.maplibregl)) clearInterval(iv); }, 500);
   }
 
   document.addEventListener('__bbdr_sweeper_colors', e => {

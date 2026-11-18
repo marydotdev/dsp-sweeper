@@ -1,20 +1,36 @@
 {
   "manifest_version": 3,
   "name": "DSP Sweeper",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "Sweeper tracking overlay for Amazon Logistics Cortex",
-  "permissions": ["storage"],
+  "permissions": [
+    "storage",
+    "unlimitedStorage",
+    "activeTab"
+  ],
   "content_scripts": [
     {
-      "matches": ["https://logistics.amazon.com/operations/execution/dv/routes*"],
-      "js": ["intercept.js", "mapcolor.js"],
+      "matches": [
+        "https://logistics.amazon.com/*"
+      ],
+      "js": [
+        "intercept.js",
+        "mapcolor.js"
+      ],
       "run_at": "document_start",
       "world": "MAIN"
     },
     {
-      "matches": ["https://logistics.amazon.com/operations/execution/dv/routes*"],
-      "js": ["content.js"],
-      "css": ["overlay.css"],
+      "matches": [
+        "https://logistics.amazon.com/*"
+      ],
+      "js": [
+        "history-core.js",
+        "content.js"
+      ],
+      "css": [
+        "overlay.css"
+      ],
       "run_at": "document_idle"
     }
   ],
@@ -22,5 +38,16 @@
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "DSP Sweeper",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
   }
 }

@@ -35,19 +35,50 @@
     lastUpdate: null,
     _mt: null,
     _apiReady: false,
+    activeDate: null,            // local date (YYYY-MM-DD) the sweeper data belongs to
   };
 
+  // Local calendar date (YYYY-MM-DD). toISOString() would give the UTC date,
+  // which rolls over in the afternoon/evening in US time zones.
   function todayStr() {
-    return new Date().toISOString().slice(0, 10);
+    const d = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   }
 
-  chrome.storage.local.get(['sweepers', 'dismissedHelpers', 'activeDate'], d => {
-    const today = todayStr();
-    if (d.activeDate && d.activeDate !== today) {
-      console.log('[DSP Sweeper] New day detected, clearing data');
-      state.sweepers = [];
-      state.dismissedHelpers = [];
-      persist();
+  /* ═══════ PAGE GATING ═══════ */
+  // Cortex is a single-page app: moving to the routes page from another Cortex
+  // page changes the URL without a page load, so this script is injected on all
+  // of logistics.amazon.com and only activates while the routes page is showing.
+  const ROUTES_PATH = '/operations/execution/dv/routes';
+  const onRoutesPage = () => location.pathname.startsWith(ROUTES_PATH);
+  let started = false;     // waitForCortex() is running or has finished
+  let userHidden = false;  // toggled from the toolbar icon
+
+  function syncPage() {
+    const on = onRoutesPage();
+    document.documentElement.classList.toggle('bbdr-hidden', !on || userHidden);
+    if (on && !started) {
+      started = true;
+      waitForCortex();
+    }
+  }
+
+  // Toolbar icon click (see background.js)
+  chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
+    if (!msg || msg.type !== 'bbdr-toggle') return;
+    userHidden = !userHidden;
+    chrome.storage.local.set({ toolbarHidden: userHidden });
+    syncPage();
+    if (!userHidden) render();
+    reply({ visible: !userHidden });
+  });
+
+  chrome.storage.local.get(['sweepers', 'dismissedHelpers', 'activeDate', 'toolbarHidden'], d => {
+    userHidden = !!d.toolbarHidden;
+    state.activeDate = d.activeDate || todayStr();
+    if (isNewDay()) {
+      clearForNewDay();
     } else {
       if (d.sweepers) {
         state.sweepers = d.sweepers;
@@ -59,14 +90,46 @@
       if (d.dismissedHelpers) state.dismissedHelpers = d.dismissedHelpers;
     }
     installAPIInterceptor();
-    waitForCortex();
+    syncPage();
+    setInterval(() => {
+      if (isNewDay()) clearForNewDay();
+      syncPage();
+    }, 1000);
   });
 
+  /* ═══════ DAILY RESET ═══════ */
+  // The data belongs to state.activeDate. Tabs are often left open overnight,
+  // so check for a date change while running, not just on page load.
+  function isNewDay() {
+    return state.activeDate !== todayStr();
+  }
+
+  function clearForNewDay() {
+    console.log(`[DSP Sweeper] New day (${todayStr()}), clearing data from ${state.activeDate}`);
+    state.activeDate = todayStr();
+    state.sweepers = [];
+    state.dismissedHelpers = [];
+    state.detectedHelpers = [];
+    state.sweeperRouteData = {};
+    state.activePopover = null;
+    state.activeDetailPanel = null;
+    state.colorPickerOpen = false;
+    persist();
+    if (started) {
+      hideDotTooltip();
+      highlightSweeperMarkers();
+      detectHelpers();
+      render();
+    }
+  }
+
   function persist() {
+    // Never stamp yesterday's sweepers with today's date
+    if (isNewDay()) { clearForNewDay(); return; }
     chrome.storage.local.set({
       sweepers: state.sweepers,
       dismissedHelpers: state.dismissedHelpers,
-      activeDate: todayStr(),
+      activeDate: state.activeDate,
     });
   }
 
@@ -127,6 +190,9 @@
       }
     }
 
+    // Save today's helpers to history (independent of confirmed sweepers)
+    recordHistory();
+
     // Detect helpers from multi-transporter routes
     detectHelpers();
 
@@ -155,6 +221,28 @@
       };
     });
     state.locationMap = locationMap;
+  }
+
+  /* ═══════ HISTORY ═══════ */
+  // Reads the stored day before merging so other tabs' updates aren't lost.
+  function recordHistory() {
+    const ex = DSPHistory.extract(state.routeSummaries, state.transporterMap);
+    if (!ex.assists.length) return;
+    const date = todayStr();
+    const key = DSPHistory.KEY_PREFIX + date;
+    chrome.storage.local.get(key, d => {
+      const day = d[key] || DSPHistory.emptyDay(date);
+      if (DSPHistory.merge(day, ex, Date.now())) chrome.storage.local.set({ [key]: day });
+    });
+  }
+
+  // transporterId → 'sweeper' | 'rescue' | 'pickup' from the current data
+  function currentHelperTypes() {
+    const day = DSPHistory.emptyDay(todayStr());
+    DSPHistory.merge(day, DSPHistory.extract(state.routeSummaries, state.transporterMap), Date.now());
+    const types = {};
+    for (const h of DSPHistory.summarizeDay(day)) types[h.id] = h.type;
+    return types;
   }
 
   /* ═══════ HELPER DETECTION ═══════ */
@@ -204,7 +292,10 @@
       }
     }
 
-    detected.sort((a, b) => b.onRoutes.length - a.onRoutes.length);
+    const types = currentHelperTypes();
+    const rank = { sweeper: 0, rescue: 1, pickup: 2 };
+    for (const d of detected) d.kind = types[d.transporterId] || null;
+    detected.sort((a, b) => (rank[a.kind] ?? 1) - (rank[b.kind] ?? 1) || b.onRoutes.length - a.onRoutes.length);
     state.detectedHelpers = detected;
   }
 
@@ -714,6 +805,7 @@
     }
 
     html += `<div class="bt-actions">`;
+    html += `<button class="bt-btn" data-act="open-history" title="Sweeper history"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg></button>`;
     html += `<button class="bt-btn${addActive}${badgeClass}"${badgeAttr}${disabledAttr} data-act="open-add" title="Add sweeper">+</button>`;
     html += `</div>`;
 
@@ -721,6 +813,12 @@
   }
 
   /* ═══════ ADD POPOVER HTML ═══════ */
+  const KIND_TITLES = {
+    sweeper: 'No route of their own, helping other drivers',
+    rescue: 'Has their own route and is helping another driver',
+    pickup: 'Only 1–2 stops: probably picked up packages marked missing, not a real sweep',
+  };
+
   function renderAddPopover() {
     const confirmedIds = new Set(state.sweepers.map(s => s.transporterId).filter(Boolean));
     const dismissedIds = new Set(state.dismissedHelpers);
@@ -735,6 +833,7 @@
         <div class="po-cand">
           <div class="po-cand-info">
             <span class="po-cand-name">${h.name}</span>
+            ${h.kind ? `<span class="po-kind po-kind-${h.kind}" title="${KIND_TITLES[h.kind]}">${h.kind}</span>` : ''}
             <span class="po-cand-routes">${h.onRoutes.join(',')}</span>
           </div>
           <div class="po-cand-actions">
@@ -907,6 +1006,10 @@
 
   function _handleAction(act, data) {
     switch (act) {
+      case 'open-history':
+        chrome.runtime.sendMessage({ type: 'bbdr-open-history' });
+        break;
+
       case 'open-add': {
         // Don't open if disabled (no candidates)
         const confirmedIds = new Set(state.sweepers.map(s => s.transporterId).filter(Boolean));
@@ -1082,11 +1185,14 @@
   /* ═══════ INIT ═══════ */
   function waitForCortex() {
     console.log('[DSP Sweeper] Waiting for Cortex...');
+    let ready = false;
     const iv = setInterval(() => {
+      if (!onRoutesPage()) return;
       // Wait for either route cards in DOM or API data
       const hasRouteCards = document.querySelectorAll('div[class*="route-"]').length > 2;
       const hasApiData = state._apiReady;
       if (hasRouteCards || hasApiData) {
+        ready = true;
         clearInterval(iv);
         initTooltip();
         initDotTooltip();
@@ -1100,7 +1206,10 @@
         console.log(`[DSP Sweeper] Ready — ${state.sweepers.length} sweepers`);
       }
     }, 1000);
-    setTimeout(() => clearInterval(iv), 60000);
+    // Give up after a minute; syncPage() will try again while on the routes page
+    setTimeout(() => {
+      if (!ready) { clearInterval(iv); started = false; }
+    }, 60000);
   }
 
 })();

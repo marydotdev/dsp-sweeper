@@ -150,6 +150,13 @@
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   max-width: 130px;
 }
+.po-kind {
+  font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+  padding: 1px 5px; border-radius: 4px; flex-shrink: 0;
+}
+.po-kind-sweeper { background: #3498db22; color: #5dade2; }
+.po-kind-rescue  { background: #10b98122; color: #34d399; }
+.po-kind-pickup  { background: #ffffff10; color: #8a8f98; }
 .po-cand-routes {
   font-size: 11px; color: #8a8f98;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -310,3 +317,12 @@
 }
 .tip-name { font-weight: 700; color: #f0f4f8; overflow: hidden; text-overflow: ellipsis; }
 .tip-detail { color: #9ca3af; overflow: hidden; text-overflow: ellipsis; }
+
+/* Hidden off the routes page, or when toggled off from the toolbar icon */
+.bbdr-hidden #bbdr-toolbar,
+.bbdr-hidden #bbdr-popover,
+.bbdr-hidden #bbdr-detail,
+.bbdr-hidden #bbdr-tip,
+.bbdr-hidden #bbdr-dot-tip {
+  display: none !important;
+}
