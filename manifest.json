@@ -1,14 +1,13 @@
 {
   "manifest_version": 3,
   "name": "DSP Sweeper",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "description": "Sweeper tracking overlay for Amazon Logistics Cortex",
-  "permissions": ["storage", "activeTab"],
-  "host_permissions": ["https://logistics.amazon.com/*"],
+  "permissions": ["storage"],
   "content_scripts": [
     {
       "matches": ["https://logistics.amazon.com/operations/execution/dv/routes*"],
-      "js": ["intercept.js"],
+      "js": ["intercept.js", "mapcolor.js"],
       "run_at": "document_start",
       "world": "MAIN"
     },
