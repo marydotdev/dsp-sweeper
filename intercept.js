@@ -6,6 +6,8 @@
 (function () {
   'use strict';
 
+  let lastRouteSummaries = null;  // last response text, re-sent if the content script missed it
+
   // Intercept fetch
   const origFetch = window.fetch;
   window.fetch = function () {
@@ -15,6 +17,7 @@
       result.then(function (response) {
         return response.clone().text().then(function (text) {
           if (url.includes('route-summaries')) {
+            lastRouteSummaries = text;
             document.dispatchEvent(new CustomEvent('__bbdr_route_summaries', { detail: text }));
           } else if (url.includes('locationUpdate')) {
             document.dispatchEvent(new CustomEvent('__bbdr_location_update', { detail: text }));
@@ -37,6 +40,7 @@
     this.addEventListener('load', function () {
       var url = self.__bbdr_url || '';
       if (url.includes('route-summaries')) {
+        lastRouteSummaries = self.responseText;
         document.dispatchEvent(new CustomEvent('__bbdr_route_summaries', { detail: self.responseText }));
       } else if (url.includes('locationUpdate')) {
         document.dispatchEvent(new CustomEvent('__bbdr_location_update', { detail: self.responseText }));
@@ -44,6 +48,10 @@
     });
     return origSend.apply(this, arguments);
   };
+
+  document.addEventListener('__bbdr_resend_last', function () {
+    if (lastRouteSummaries) document.dispatchEvent(new CustomEvent('__bbdr_route_summaries', { detail: lastRouteSummaries }));
+  });
 
   console.log('[DSP Sweeper] API interceptor active (MAIN world)');
 })();

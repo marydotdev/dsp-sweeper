@@ -326,3 +326,20 @@
 .bbdr-hidden #bbdr-dot-tip {
   display: none !important;
 }
+
+/* ---- PAST-DAY LOADING BANNER ---- */
+#bbdr-step-banner {
+  position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+  z-index: 100003;
+  background: #1a1a1a; color: #d4dae3; border: 1px solid #f59e0b88; border-radius: 8px;
+  font: 13px/1.4 sans-serif; padding: 8px 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.5);
+  display: flex; align-items: center; gap: 10px;
+  max-width: min(720px, calc(100vw - 32px));
+}
+#bbdr-step-banner b { color: #f59e0b; }
+#bbdr-step-banner button {
+  background: #252525; color: #eee; border: 1px solid #444; border-radius: 6px;
+  padding: 3px 10px; cursor: pointer; font: inherit;
+}
+#bbdr-step-banner button:hover { border-color: #ef4444; color: #ef4444; }

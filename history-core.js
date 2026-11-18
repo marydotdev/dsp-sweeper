@@ -21,6 +21,7 @@
   const KEY_PREFIX = 'hist:';
   const OVERRIDES_KEY = 'histOverrides';  // { 'YYYY-MM-DD': { transporterId: type } }
   const TYPES = ['sweeper', 'rescue', 'pickup'];
+  const HISTORY_VERSION = 2;
 
   const stopsOf = t => t.routeDeliveryProgress?.totalStops || 0;
   const doneOf = t => t.routeDeliveryProgress?.completedStops || 0;
@@ -29,32 +30,64 @@
     return { date, updatedAt: null, assists: {}, ownRoutes: {} };
   }
 
-  // Primary driver = the transporter with the most stops on the route
-  // (same rule the toolbar uses).
-  function primaryOf(transporters) {
-    return transporters.reduce((a, b) => (stopsOf(b) > stopsOf(a) ? b : a));
+  // Primary driver = the driver Cortex assigned the route to
+  // (transporterIdFromRms). Falls back to the most stops if that driver
+  // isn't on the route.
+  function primaryOf(route, transporters) {
+    const assigned = transporters.find(t => t.transporterId === route.transporterIdFromRms);
+    return assigned || transporters.reduce((a, b) => (stopsOf(b) > stopsOf(a) ? b : a));
+  }
+
+  // "YYYY-MM-DD" from a route-summaries response (routes carry localDate: [y, m, d])
+  function responseDate(data) {
+    const ld = (data?.rmsRouteSummaries || []).find(r => Array.isArray(r.localDate))?.localDate;
+    if (!ld) return null;
+    const pad = n => String(n).padStart(2, '0');
+    return `${ld[0]}-${pad(ld[1])}-${pad(ld[2])}`;
+  }
+
+  // transporterId → { name } from a route-summaries response
+  function namesFrom(data) {
+    const map = {};
+    for (const t of data?.transporters || []) {
+      map[t.transporterId] = { name: `${t.firstName || ''} ${t.lastName || ''}`.replace(/\s+/g, ' ').trim() };
+    }
+    return map;
   }
 
   function extract(routeSummaries, transporterMap) {
     const nameOf = id => transporterMap[id]?.name || 'Unknown';
     const ownRoute = {};
     const assists = [];
+    const areas = new Set();
+    let routeCount = 0;
 
     for (const r of routeSummaries || []) {
       const ts = (r.transporters || []).filter(t => t.transporterId);
       if (!ts.length) continue;
-      const primary = primaryOf(ts);
+      routeCount++;
+      if (r.serviceAreaId) areas.add(r.serviceAreaId);
+      const primary = primaryOf(r, ts);
       const prev = ownRoute[primary.transporterId];
       if (!prev || stopsOf(primary) > prev.totalStops) {
         ownRoute[primary.transporterId] = { routeCode: r.routeCode, totalStops: stopsOf(primary) };
       }
       if (ts.length < 2) continue;
+      // Ride-along helpers on "with Helper" routes work the same itinerary;
+      // they aren't rescuing the driver.
+      const rideAlong = new Set();
       for (const t of ts) {
-        if (t === primary || stopsOf(t) === 0) continue;
+        if (t.itineraryPartners?.programType !== 'HELPER_ROUTE') continue;
+        for (const p of t.itineraryPartners.partnerDetails || []) if (p.transporterId) rideAlong.add(p.transporterId);
+      }
+      for (const t of ts) {
+        if (t === primary || stopsOf(t) === 0 || rideAlong.has(t.transporterId)) continue;
+        if (primary.itineraryId && t.itineraryId === primary.itineraryId) continue;  // same itinerary = same work day, not a rescue
         assists.push({
           helperId: t.transporterId,
           helperName: nameOf(t.transporterId),
           routeCode: r.routeCode,
+          serviceAreaId: r.serviceAreaId || null,
           driverId: primary.transporterId,
           driverName: nameOf(primary.transporterId),
           completedStops: doneOf(t),
@@ -62,32 +95,52 @@
         });
       }
     }
-    return { assists, ownRoute };
+    return { assists, ownRoute, routeCount, areas: [...areas] };
   }
 
-  // Merge one update into a stored day. Assists are never removed once seen.
+  // Update a stored day from one route-summaries response. Each response is a
+  // full picture of the station for that day (helpers stay listed after they
+  // finish), so it replaces what was saved for the stations it covers. Only
+  // the time each assist was first seen is carried over.
   // Returns true if anything changed.
   function merge(day, extracted, now) {
-    const before = JSON.stringify(day);
+    const before = JSON.stringify([day.assists, day.ownRoutes, day.routeCount]);
+    const covered = new Set(extracted.areas || []);
+    const old = day.assists || {};
+    const assists = {};
+    for (const [k, a] of Object.entries(old)) {
+      // keep other stations' entries; drop this station's (and pre-fix entries with no station)
+      if (a.serviceAreaId && !covered.has(a.serviceAreaId)) assists[k] = a;
+    }
     for (const a of extracted.assists) {
       const key = a.helperId + '|' + a.routeCode;
-      const ex = day.assists[key];
-      if (ex) {
-        const keep = { firstSeen: ex.firstSeen };
-        if (a.helperName === 'Unknown') keep.helperName = ex.helperName;
-        if (a.driverName === 'Unknown' && a.driverId === ex.driverId) keep.driverName = ex.driverName;
-        Object.assign(ex, a, keep);
-      } else {
-        day.assists[key] = Object.assign({ firstSeen: now }, a);
-      }
+      assists[key] = Object.assign({}, a, { firstSeen: old[key]?.firstSeen || now });
     }
-    const helperIds = new Set(Object.values(day.assists).map(a => a.helperId));
-    for (const id of helperIds) {
-      if (extracted.ownRoute[id]) day.ownRoutes[id] = extracted.ownRoute[id];
+    day.assists = assists;
+    const ownRoutes = {};
+    for (const id of new Set(Object.values(assists).map(a => a.helperId))) {
+      const own = extracted.ownRoute[id] || day.ownRoutes?.[id];
+      if (own) ownRoutes[id] = own;
     }
-    const changed = JSON.stringify(day) !== before;
+    day.ownRoutes = ownRoutes;
+    day.routeCount = extracted.routeCount;
+    day.version = HISTORY_VERSION;
+    const changed = JSON.stringify([day.assists, day.ownRoutes, day.routeCount]) !== before;
     if (changed) day.updatedAt = now;
     return changed;
+  }
+
+  // History saved before version 2 used a different rule for who owned a
+  // route and never dropped stale entries. It can all be reloaded from
+  // Cortex, so discard it (type overrides are kept).
+  function migrate(storage, done) {
+    storage.get(null, d => {
+      if (d.histVersion === HISTORY_VERSION) return done && done(false);
+      const stale = Object.keys(d).filter(k => k.startsWith(KEY_PREFIX) && d[k]?.version !== HISTORY_VERSION);
+      storage.remove(stale.concat('histAutoBackfill', 'histBackfill', 'histBackfillRequest'), () => {
+        storage.set({ histVersion: HISTORY_VERSION }, () => done && done(true));
+      });
+    });
   }
 
   function autoType(assists, ownRoute) {
@@ -168,6 +221,9 @@
 
   root.DSPHistory = {
     PICKUP_MAX_STOPS, OWN_ROUTE_MIN_STOPS, KEY_PREFIX, OVERRIDES_KEY, TYPES,
-    emptyDay, extract, merge, summarizeDay, rescuedTally, helperTally,
+    HISTORY_VERSION, migrate,
+    STEP_KEY: 'histStepper',              // progress of a "load past days" run (content.js)
+    STEP_REQUEST_KEY: 'histStepRequest',  // { days, force, at } written by the history page
+    emptyDay, extract, merge, summarizeDay, rescuedTally, helperTally, responseDate, namesFrom,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
