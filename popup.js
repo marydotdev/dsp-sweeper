@@ -3,13 +3,17 @@
  *
  * Reads what content.js saves to chrome.storage.local:
  *   sweepers / activeDate / toolbarHidden  — confirmed sweepers for activeDate
- *   hist:YYYY-MM-DD / histOverrides        — every helper seen today (history-core.js)
+ *   hist:YYYY-MM-DD / histOverrides        — today's helpers, for the stat tiles (history-core.js)
  */
 (function () {
   'use strict';
 
   const ORIGIN = 'https://logistics.amazon.com';
   const ROUTES_URL = ORIGIN + '/operations/execution/dv/routes';
+
+  // TODO: set this to the instructions / more-info page once it exists.
+  // While it's empty, the popup shows the link greyed out with "coming soon".
+  const HELP_URL = '';
 
   // Keep in sync with SWEEPER_COLORS in content.js
   const SWEEPER_COLORS = [
@@ -48,7 +52,6 @@
     const realAssists = real.flatMap(h => h.assists.filter(a => !a.tiny));
     const stats = [
       [sweepers.length, 'Sweepers'],
-      [real.filter(h => h.type === 'rescue').length, 'Rescuers'],
       [realAssists.length, 'Routes helped'],
       [realAssists.reduce((s, a) => s + a.completedStops, 0), 'Stops done'],
     ];
@@ -64,39 +67,14 @@
     $('sweepers').innerHTML = sweepers.map(sw => {
       const color = SWEEPER_COLORS[sw.colorIndex ?? 0];
       const cw = sw.currentWith;
-      const routes = new Set((sw.history || []).map(h => h.routeCode));
-      if (cw?.routeCode) routes.add(cw.routeCode);
       let where = 'Not on a route right now';
       if (cw?.routeCode) {
         const driver = shortName(cw.driverName);
         where = `On ${esc(cw.routeCode)}${driver ? ' with ' + esc(driver) : ''}`;
-        if (cw.arrivedAt) where += ` since ${esc(cw.arrivedAt)}`;
-        if (cw.totalStops) where += ` · ${cw.completedStops || 0}/${cw.totalStops} stops`;
       }
       return `<div class="row">
         <span class="dot" style="background:${color}"></span>
         <div class="main"><div class="name">${esc(sw.name)}</div><div class="meta">${where}</div></div>
-        <span class="num" title="Routes helped today">${routes.size} route${routes.size === 1 ? '' : 's'}</span>
-      </div>`;
-    }).join('');
-  }
-
-  function renderHelpers(helpers) {
-    if (!helpers.length) {
-      $('helpers').innerHTML = '<div class="empty">No helpers seen yet today. Open the routes page to start tracking.</div>';
-      return;
-    }
-    $('helpers').innerHTML = helpers.map(h => {
-      const routes = h.assists.map(a => {
-        const driver = shortName(a.driverName);
-        return esc(a.routeCode) + (driver ? ` (${esc(driver)})` : '');
-      }).join(', ');
-      return `<div class="row">
-        <div class="main">
-          <div><span class="name">${esc(h.name)}</span><span class="kind kind-${h.type}">${h.type}</span></div>
-          <div class="meta">${routes}</div>
-        </div>
-        <span class="num" title="Stops completed / assigned">${h.completedStops}/${h.totalStops}</span>
       </div>`;
     }).join('');
   }
@@ -150,7 +128,14 @@
 
     renderStats(sweepers, helpers);
     renderSweepers(sweepers);
-    renderHelpers(helpers);
     setupActions(!!d.toolbarHidden);
   });
+
+  if (HELP_URL) {
+    $('help').href = HELP_URL;
+  } else {
+    $('help').classList.add('disabled');
+    $('help').removeAttribute('href');
+    $('help-soon').hidden = false;
+  }
 })();

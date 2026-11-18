@@ -80,10 +80,10 @@ Click the reset icon on the left side of the toolbar to clear today's sweeper li
 
 ### Extension Icon
 Click the DSP Sweeper icon in Chrome's toolbar to open a summary of today:
-- **Totals** — confirmed sweepers, rescuers, routes helped, and stops done
-- **Sweepers** — each confirmed sweeper's current route, driver, and how many routes they've helped today
-- **Helpers today** — everyone seen helping, typed as sweeper / rescue / pickup, with the routes they helped
+- **Totals** — confirmed sweepers, routes helped, and stops done
+- **Sweepers** — each confirmed sweeper and the route they're on right now
 - **Buttons** — show/hide the overlay (on the routes page) or open the routes page (anywhere else), plus **Full history**
+- **How it works & help** — link to the instructions page (shows "coming soon" until `HELP_URL` in `popup.js` is set)
 
 ## Testing
 
