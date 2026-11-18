@@ -1,7 +1,7 @@
 /**
  * DSP Sweeper — Content Script
  *
- * Colored map dots + sweeper tracking.
+ * Colored map pins (via mapcolor.js) + sweeper tracking.
  * Data from XHR interception of Cortex API responses.
  * Compact toolbar at bottom-right with detail panel.
  */
@@ -328,14 +328,23 @@
     '#A3CB38',  // peridot
     '#4834D4',  // tanzanite
     '#FDA7DF',  // orchid
+    '#E74C3C',  // garnet
+    '#F39C12',  // amber
+    '#F1C40F',  // citrine
+    '#1ABC9C',  // turquoise
+    '#00CEC9',  // aquamarine
+    '#E67E22',  // topaz
+    '#C0392B',  // ruby
+    '#8E6E53',  // smoky quartz
   ];
 
+  // New sweepers get the least-used color; colors can be shared.
   function assignSweeperColor(sweeper) {
-    const used = new Set(state.sweepers.map(s => s.colorIndex).filter(i => i != null));
-    for (let i = 0; i < SWEEPER_COLORS.length; i++) {
-      if (!used.has(i)) { sweeper.colorIndex = i; return; }
+    const counts = new Array(SWEEPER_COLORS.length).fill(0);
+    for (const s of state.sweepers) {
+      if (s !== sweeper && s.colorIndex != null && counts[s.colorIndex] != null) counts[s.colorIndex]++;
     }
-    sweeper.colorIndex = 0;
+    sweeper.colorIndex = counts.indexOf(Math.min(...counts));
   }
 
   function getSweeperColor(sw) {
@@ -492,59 +501,20 @@
   }
 
   /* ═══════ SWEEPER MARKER HIGHLIGHT ═══════ */
+  // Cortex renders pins on a MapLibre canvas. mapcolor.js (MAIN world) does
+  // the recoloring; we just send it transporterId → color.
+  let _lastColorsJson = '';
   function highlightSweeperMarkers() {
-    const transporterSweeper = {};
-    state.sweepers.forEach(sw => {
-      if (sw.transporterId) transporterSweeper[sw.transporterId] = sw;
-    });
-
-    const initialsOnMap = {};
-    for (const marker of Object.values(state.personMarkers)) {
-      if (marker.initials) {
-        if (!initialsOnMap[marker.initials]) initialsOnMap[marker.initials] = new Set();
-        initialsOnMap[marker.initials].add(marker.transporterId || marker.routeCode);
+    const colors = {};
+    for (const sw of state.sweepers) {
+      if (sw.transporterId && !sw.transporterId.startsWith('dom_')) {
+        colors[sw.transporterId] = getSweeperColor(sw);
       }
     }
-
-    const initialsSweeper = {};
-    state.sweepers.forEach(sw => {
-      const ini = nameToInitials(sw.name);
-      const onMap = initialsOnMap[ini];
-      if (!onMap || onMap.size <= 1) initialsSweeper[ini] = sw;
-    });
-
-    document.querySelectorAll('.mapboxgl-marker').forEach(marker => {
-      const svg = marker.querySelector('svg');
-      if (!svg) return;
-      const circle = svg.querySelector('circle:not(.bbdr-ring)');
-      if (!circle) return;
-
-      const initials = marker.querySelector('text')?.textContent?.trim() || '';
-      const svgClass = svg.getAttribute('class') || '';
-
-      const transMatch = svgClass.match(/transporter-(\S+)/);
-      const tid = transMatch ? transMatch[1] : '';
-      const sw = (tid && transporterSweeper[tid]) || (initials && initialsSweeper[initials]) || null;
-
-      const ring = svg.querySelector('.bbdr-ring');
-      if (ring) ring.remove();
-
-      if (sw) {
-        if (!circle.getAttribute('data-bbdr-orig-fill')) {
-          circle.setAttribute('data-bbdr-orig-fill', circle.getAttribute('fill') || '');
-        }
-        circle.style.fill = getSweeperColor(sw);
-        marker.setAttribute('data-bbdr-sw', 'sweeper');
-        marker.setAttribute('data-bbdr-sw-name', sw.name);
-      } else if (marker.getAttribute('data-bbdr-sw')) {
-        const origFill = circle.getAttribute('data-bbdr-orig-fill');
-        marker.removeAttribute('data-bbdr-sw');
-        marker.removeAttribute('data-bbdr-sw-name');
-        circle.removeAttribute('data-bbdr-orig-fill');
-        if (origFill) circle.style.fill = origFill;
-        else circle.style.removeProperty('fill');
-      }
-    });
+    const json = JSON.stringify(colors);
+    if (json === _lastColorsJson) return;
+    _lastColorsJson = json;
+    document.dispatchEvent(new CustomEvent('__bbdr_sweeper_colors', { detail: json }));
   }
 
   /* ═══════ MAP TOOLTIP ═══════ */
@@ -557,59 +527,46 @@
     document.body.appendChild(tipEl);
   }
 
+  function tooltipHtml(sw) {
+    const cur = sw.currentWith;
+    let html = `<div class="tip-name" style="color:${getSweeperColor(sw)}">${sw.name}</div>`;
+    if (cur) {
+      const routeData = state.sweeperRouteData[sw.transporterId];
+      const stops = routeData ? `${routeData.completedStops}/${routeData.totalStops}` : '...';
+      html += `<div class="tip-detail">${cur.driverName} · ${cur.routeCode} · ${stops} stops</div>`;
+      html += `<div class="tip-detail">Since ${cur.arrivedAt}</div>`;
+    } else {
+      html += `<div class="tip-detail">Detecting route...</div>`;
+    }
+    return html;
+  }
+
+  let _tipBound = false;
   function attachMarkerTooltips() {
-    const mapContainer = document.querySelector('.mapboxgl-canvas-container')?.parentElement;
-    if (!mapContainer || mapContainer._bbdrTipBound) return;
-    mapContainer._bbdrTipBound = true;
+    if (_tipBound) return;
+    _tipBound = true;
+    document.addEventListener('__bbdr_hover', e => {
+      if (!tipEl) return;
+      let d = null;
+      try { d = JSON.parse(e.detail); } catch {}
+      const sw = d && state.sweepers.find(s => s.transporterId === d.tid);
+      if (!sw) { tipEl.style.display = 'none'; return; }
 
-    mapContainer.addEventListener('mouseover', e => {
-      const marker = e.target.closest('.mapboxgl-marker[data-bbdr-sw]');
-      if (!marker || !tipEl) return;
-
-      const swName = marker.getAttribute('data-bbdr-sw-name');
-      if (!swName) return;
-
-      const sw = state.sweepers.find(s => s.name === swName);
-      if (!sw) return;
-
-      const cur = sw.currentWith;
-      let html = `<div class="tip-name" style="color:${getSweeperColor(sw)}">${sw.name}</div>`;
-      if (cur) {
-        const routeData = sw.transporterId ? state.sweeperRouteData[sw.transporterId] : null;
-        const stops = routeData ? `${routeData.completedStops}/${routeData.totalStops}` : '...';
-        html += `<div class="tip-detail">${cur.driverName} · ${cur.routeCode} · ${stops} stops</div>`;
-        html += `<div class="tip-detail">Since ${cur.arrivedAt}</div>`;
-      } else {
-        html += `<div class="tip-detail">Detecting route...</div>`;
-      }
-
-      tipEl.innerHTML = html;
+      tipEl.innerHTML = tooltipHtml(sw);
       tipEl.style.visibility = 'hidden';
       tipEl.style.display = 'block';
-
       requestAnimationFrame(() => {
-        const rect = marker.getBoundingClientRect();
         const tw = tipEl.offsetWidth;
         const th = tipEl.offsetHeight;
-        let left = rect.left + rect.width / 2 - tw / 2;
-        let top = rect.top - th - 8;
+        let left = d.x - tw / 2;
+        let top = d.y - th - 16;
         if (left < 4) left = 4;
         if (left + tw > window.innerWidth - 4) left = window.innerWidth - tw - 4;
-        if (top < 4) top = rect.bottom + 8;
+        if (top < 4) top = d.y + 16;
         tipEl.style.left = left + 'px';
         tipEl.style.top = top + 'px';
         tipEl.style.visibility = 'visible';
       });
-    });
-
-    mapContainer.addEventListener('mouseout', e => {
-      const marker = e.target.closest('.mapboxgl-marker[data-bbdr-sw]');
-      if (marker && tipEl) {
-        const related = e.relatedTarget;
-        if (!related || !marker.contains(related)) {
-          tipEl.style.display = 'none';
-        }
-      }
     });
   }
 
@@ -1047,8 +1004,6 @@
         if (!sw) return;
         const newIdx = +data.colorIdx;
         if (sw.colorIndex !== newIdx) {
-          const other = state.sweepers.find(s => s !== sw && s.colorIndex === newIdx);
-          if (other) other.colorIndex = sw.colorIndex;
           sw.colorIndex = newIdx;
           persist();
           highlightSweeperMarkers();
