@@ -1,0 +1,45 @@
+:root {
+  --bg: #141414; --panel: #1d1d1d; --line: #2c2c2c;
+  --text: #d4dae3; --strong: #f2f4f7; --muted: #8a8f98;
+  --accent: #f59e0b;
+  --sweeper: #5dade2; --rescue: #34d399; --pickup: #8a8f98;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; width: 340px; max-height: 560px;
+  background: var(--bg); color: var(--text);
+  font: 13px/1.4 system-ui, sans-serif;
+}
+.hdr { display: flex; gap: 10px; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+h1 { margin: 0; font-size: 15px; color: var(--strong); }
+.sub { color: var(--muted); font-size: 12px; }
+h2 { margin: 0 0 6px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+section { padding: 10px 14px; border-bottom: 1px solid var(--line); }
+
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.stat { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 4px; text-align: center; }
+.stat b { display: block; font-size: 17px; color: var(--strong); font-variant-numeric: tabular-nums; }
+.stat span { font-size: 11px; color: var(--muted); }
+
+.row { display: flex; gap: 8px; align-items: flex-start; padding: 5px 0; }
+.row + .row { border-top: 1px solid var(--line); }
+.dot { flex: none; width: 10px; height: 10px; border-radius: 50%; margin-top: 4px; }
+.main { flex: 1; min-width: 0; }
+.name { color: var(--strong); font-weight: 600; }
+.meta { color: var(--muted); font-size: 12px; }
+.num { flex: none; color: var(--text); font-variant-numeric: tabular-nums; font-size: 12px; }
+
+.kind { display: inline-block; font-size: 10px; font-weight: 600; text-transform: uppercase; padding: 1px 5px; border-radius: 4px; margin-left: 4px; vertical-align: 1px; }
+.kind-sweeper { color: var(--sweeper); background: #5dade222; }
+.kind-rescue { color: var(--rescue); background: #34d39922; }
+.kind-pickup { color: var(--pickup); background: #8a8f9822; }
+
+.empty { color: var(--muted); font-size: 12px; padding: 2px 0; }
+
+.actions { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 14px; }
+button {
+  flex: 1; font: inherit; font-size: 12px; cursor: pointer;
+  background: var(--panel); color: var(--text);
+  border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px;
+}
+button:hover { color: var(--accent); border-color: #f59e0b88; }

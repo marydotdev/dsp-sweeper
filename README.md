@@ -79,10 +79,11 @@ A route's assigned driver comes from Cortex (`transporterIdFromRms`); anyone els
 Click the reset icon on the left side of the toolbar to clear today's sweeper list (history is not affected). Data auto-resets at midnight (your computer's local time), including in tabs left open overnight.
 
 ### Extension Icon
-Click the DSP Sweeper icon in Chrome's toolbar:
-- **On the routes page** — shows or hides the sweeper toolbar (remembered across reloads)
-- **Elsewhere in Cortex** — goes to the routes page
-- **On any other site** — opens the routes page in a new tab
+Click the DSP Sweeper icon in Chrome's toolbar to open a summary of today:
+- **Totals** — confirmed sweepers, rescuers, routes helped, and stops done
+- **Sweepers** — each confirmed sweeper's current route, driver, and how many routes they've helped today
+- **Helpers today** — everyone seen helping, typed as sweeper / rescue / pickup, with the routes they helped
+- **Buttons** — show/hide the overlay (on the routes page) or open the routes page (anywhere else), plus **Full history**
 
 ## Testing
 
@@ -101,7 +102,7 @@ Click the DSP Sweeper icon in Chrome's toolbar:
 5. Change a color, then pan or zoom the map — the pin should keep its new color.
 6. Reload the page — color choices should persist.
 7. With helpers on the routes page, click the clock icon — the history page should open and list today's helpers. Change a helper's type and check the **Most rescued** tab updates. Then pick yesterday in Cortex's date picker and check it appears on the history page. Finally, under *Automatically*, pick **Last 7 days**, click **Load automatically…**, check the confirmation describes what will happen, click **Start automation**, and check the Cortex tab shows the automation banner, steps through the days, and returns to today. Try **Stop** partway through too.
-8. Click the extension icon — the toolbar should hide; click again to bring it back. From another site, the icon should open the routes page.
+8. Click the extension icon — the panel should show today's totals, sweepers, and helpers, matching the toolbar. On the routes page, **Hide overlay** / **Show overlay** should toggle the toolbar; from another site, **Open routes page** should open it.
 
 ### Troubleshooting
 - Open the console on the Cortex page (Cmd+Option+J) and look for errors from `content.js`, `intercept.js`, or `mapcolor.js`.
@@ -112,7 +113,8 @@ Click the DSP Sweeper icon in Chrome's toolbar:
 ```
 dsp-sweeper/
 ├── manifest.json     # Extension config (Manifest V3)
-├── background.js     # Toolbar icon click handler (service worker)
+├── background.js     # Service worker (opens the history page)
+├── popup.html/.js/.css    # Toolbar icon panel: today's summary
 ├── content.js        # Main logic — tracking, UI, marker highlighting
 ├── history-core.js   # Saves daily helper history and classifies sweeper / rescue / pickup
 ├── history.html/.js/.css  # Sweeper history page
@@ -129,6 +131,6 @@ dsp-sweeper/
 
 - **storage** — persist sweeper data across page refreshes
 - **unlimitedStorage** — keep months of daily history without hitting Chrome's 10 MB storage cap
-- **activeTab** — read the current tab's URL when the toolbar icon is clicked
+- **activeTab** — read the current tab's URL when the toolbar icon panel opens
 
 Content scripts are injected on `https://logistics.amazon.com/*` (Cortex is a single-page app, so the routes page can be reached without a page load), but the overlay only appears on `/operations/execution/dv/routes`.
