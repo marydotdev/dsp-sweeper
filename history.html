@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sweeper History</title>
+  <link rel="stylesheet" href="history.css">
+</head>
+<body>
+  <header class="top">
+    <div class="title">
+      <img class="logo" src="icons/logo.png" alt="" width="36" height="36">
+      <h1>Sweeper History</h1>
+    </div>
+    <div class="controls">
+      <label>Range
+        <select id="range">
+          <option value="7">Last 7 days</option>
+          <option value="30" selected>Last 30 days</option>
+          <option value="90">Last 90 days</option>
+          <option value="0">All time</option>
+        </select>
+      </label>
+      <button id="export" type="button">Export CSV</button>
+    </div>
+  </header>
+
+  <section class="backfill" aria-labelledby="bf-title">
+    <h2 id="bf-title" class="bf-title">Add past days</h2>
+    <p class="bf-intro">Today is saved automatically while the Cortex routes page is open. For earlier days, choose one of these:</p>
+    <div class="bf-options">
+      <div class="bf-option">
+        <h3>Manually <span class="muted small">(no automation)</span></h3>
+        <ol class="bf-steps">
+          <li>Open the <a href="https://logistics.amazon.com/operations/execution/dv/routes" target="_blank" rel="noopener">Cortex routes page</a>.</li>
+          <li>Click Cortex's date box (next to the station name) and pick an earlier day.</li>
+          <li>Wait for that day's routes to load. The day is saved and shows up here.</li>
+          <li>Repeat for each day you want, then switch Cortex back to today.</li>
+        </ol>
+        <p>Looking at past days doesn't change your sweeper toolbar.</p>
+      </div>
+      <div class="bf-option bf-auto">
+        <h3>Automatically <span class="tag-auto">automates your browser</span></h3>
+        <p>The extension takes over your open Cortex routes tab and changes its date to each missing day, one after another (about 10 seconds per day). It saves each day, then returns the tab to today. Don't use that tab while it runs. It uses your Cortex sign-in, so check that automated use fits Amazon's terms for your DSP.</p>
+        <div class="bf-row">
+          <select id="bf-days" aria-label="How many days to load">
+            <option value="7">Last 7 days</option>
+            <option value="14">Last 14 days</option>
+            <option value="30" selected>Last 30 days</option>
+            <option value="60">Last 60 days</option>
+          </select>
+          <label class="bf-force"><input type="checkbox" id="bf-force"> Reload days already saved</label>
+          <button id="bf-go" type="button">Load automatically…</button>
+          <button id="bf-stop" type="button" hidden>Stop</button>
+        </div>
+        <div id="bf-confirm" class="bf-confirm" hidden>
+          <p id="bf-confirm-text"></p>
+          <div class="bf-row">
+            <button id="bf-start" type="button" class="primary">Start automation</button>
+            <button id="bf-cancel" type="button">Cancel</button>
+          </div>
+        </div>
+        <div id="bf-status" class="bf-status" role="status"></div>
+      </div>
+    </div>
+  </section>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="days" class="on">By day</button>
+    <button role="tab" data-tab="rescued">Most rescued</button>
+    <button role="tab" data-tab="helpers">Sweepers &amp; rescuers</button>
+  </nav>
+
+  <main id="view"></main>
+
+  <footer class="legend">
+    <span><b class="kind kind-sweeper">sweeper</b> no route of their own, helps other drivers</span>
+    <span><b class="kind kind-rescue">rescue</b> has their own route and also helped another driver</span>
+    <span><b class="kind kind-pickup">pickup</b> took only 1–2 stops (usually packages marked missing). Not counted as a rescue</span>
+    <span>Change a helper's type for a day with the dropdown next to their name.</span>
+  </footer>
+
+  <script src="history-core.js"></script>
+  <script src="history.js"></script>
+</body>
+</html>

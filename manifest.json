@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "DSP Sweeper",
   "version": "0.3.0",
-  "description": "Sweeper tracking overlay for Amazon Logistics Cortex",
+  "description": "See your sweepers on the Amazon Logistics Cortex route map, track who they're helping, and keep a daily history of rescues.",
   "permissions": [
     "storage",
     "unlimitedStorage",
@@ -48,6 +48,7 @@
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
       "128": "icons/icon128.png"
-    }
+    },
+    "default_popup": "popup.html"
   }
 }

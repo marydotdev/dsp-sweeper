@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>DSP Sweeper</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header class="hdr">
+    <img class="logo" src="icons/logo.png" alt="" width="32" height="32">
+    <div>
+      <h1>Today</h1>
+      <div id="date" class="sub"></div>
+    </div>
+  </header>
+
+  <section id="stats" class="stats"></section>
+
+  <section class="card">
+    <h2>Sweepers</h2>
+    <div id="sweepers"></div>
+  </section>
+
+  <footer class="actions">
+    <button id="go-routes" type="button" class="primary" hidden>Open routes page</button>
+    <button id="toggle" type="button" hidden>Hide overlay</button>
+    <button id="history" type="button">Full history</button>
+  </footer>
+
+  <div class="help">
+    <a id="help" href="#" target="_blank" rel="noopener">How it works &amp; help</a>
+    <span id="help-soon" class="soon" hidden>coming soon</span>
+  </div>
+
+  <script src="history-core.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

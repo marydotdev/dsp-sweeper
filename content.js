@@ -74,6 +74,8 @@
     reply({ visible: !userHidden });
   });
 
+  DSPHistory.migrate(chrome.storage.local, () => resumeStepping());
+
   chrome.storage.local.get(['sweepers', 'dismissedHelpers', 'activeDate', 'toolbarHidden'], d => {
     userHidden = !!d.toolbarHidden;
     state.activeDate = d.activeDate || todayStr();
@@ -153,11 +155,23 @@
         console.warn('[DSP Sweeper] locationUpdate parse error:', err);
       }
     });
+    // The page's first route request can finish before these listeners exist;
+    // ask intercept.js to hand over the last response it saw.
+    document.dispatchEvent(new CustomEvent('__bbdr_resend_last'));
     console.log('[DSP Sweeper] API event listeners installed');
   }
 
   /* ═══════ API DATA PROCESSING ═══════ */
   function processRouteSummaries(data) {
+    // Save every response to history under the date its routes belong to.
+    // If Cortex is showing a past day, stop there so today's live sweepers aren't touched.
+    const dataDate = DSPHistory.responseDate(data) || todayStr();
+    saveHistoryDay(dataDate, data, dataDate < todayStr()).then(() => onStepDayLoaded(dataDate));
+    if (dataDate !== todayStr()) {
+      console.log(`[DSP Sweeper] Cortex is showing ${dataDate}; saved to history, live tracking unchanged`);
+      return;
+    }
+
     // Build transporter name map
     const transporterMap = {};
     if (data.transporters) {
@@ -190,9 +204,6 @@
       }
     }
 
-    // Save today's helpers to history (independent of confirmed sweepers)
-    recordHistory();
-
     // Detect helpers from multi-transporter routes
     detectHelpers();
 
@@ -224,17 +235,156 @@
   }
 
   /* ═══════ HISTORY ═══════ */
-  // Reads the stored day before merging so other tabs' updates aren't lost.
-  function recordHistory() {
-    const ex = DSPHistory.extract(state.routeSummaries, state.transporterMap);
-    if (!ex.assists.length) return;
-    const date = todayStr();
+  // Merge one route-summaries response into hist:<date>. Reads the stored day
+  // first so other tabs' updates aren't lost. complete = Cortex was showing a
+  // past day, so this is that day's final data.
+  function saveHistoryDay(date, data, complete) {
+    const ex = DSPHistory.extract(data.rmsRouteSummaries || [], DSPHistory.namesFrom(data));
     const key = DSPHistory.KEY_PREFIX + date;
-    chrome.storage.local.get(key, d => {
-      const day = d[key] || DSPHistory.emptyDay(date);
-      if (DSPHistory.merge(day, ex, Date.now())) chrome.storage.local.set({ [key]: day });
+    return new Promise(resolve => {
+      chrome.storage.local.get(key, d => {
+        const day = d[key] || DSPHistory.emptyDay(date);
+        let changed = DSPHistory.merge(day, ex, Date.now());
+        if (complete && !day.complete) { day.complete = true; changed = true; }
+        if (changed || !d[key]) chrome.storage.local.set({ [key]: day }, resolve);
+        else resolve();
+      });
     });
   }
+
+  /* ═══════ HISTORY: STEP THROUGH PAST DAYS ═══════ */
+  // Cortex signs its own API requests, so the extension can't ask for other
+  // dates itself. Instead, when you click Load on the history page, this tab
+  // opens each missing date in Cortex (same as using the date picker), waits
+  // for Cortex to load that day's routes, saves it, and moves on. When it's
+  // done it goes back to today. Progress lives in storage because every date
+  // is a fresh page load; only the tab that started the run follows it.
+  const STEP_KEY = DSPHistory.STEP_KEY;
+  const STEP_PAUSE_MS = 4000;      // pause between dates so Cortex isn't rushed
+  const STEP_TIMEOUT_MS = 45000;   // give up on a date if Cortex doesn't load it
+  const tabToken = (() => {
+    try {
+      let t = sessionStorage.getItem('bbdrTab');
+      if (!t) { t = Math.random().toString(36).slice(2); sessionStorage.setItem('bbdrTab', t); }
+      return t;
+    } catch { return 'tab'; }
+  })();
+  let stepCurrent = null;  // date this tab is waiting for
+  let stepTimer = null;
+  let stepBanner = null;
+
+  const getStep = () => new Promise(r => chrome.storage.local.get(STEP_KEY, d => r(d[STEP_KEY] || null)));
+  const setStep = st => new Promise(r => chrome.storage.local.set({ [STEP_KEY]: Object.assign(st, { updatedAt: Date.now() }) }, r));
+  const stepIsLive = st => st && st.running && Date.now() - (st.updatedAt || 0) < STEP_TIMEOUT_MS * 2;
+
+  function urlForDate(date) {
+    const u = new URL(location.href);
+    u.searchParams.set('selectedDay', date);
+    return u.toString();
+  }
+
+  function showStepBanner(st) {
+    if (!stepBanner) {
+      stepBanner = document.createElement('div');
+      stepBanner.id = 'bbdr-step-banner';
+      stepBanner.addEventListener('click', e => {
+        if (e.target.closest('[data-act="cancel-step"]')) getStep().then(cur => cur && setStep(Object.assign(cur, { cancel: true })).then(() => finishStepping(cur)));
+      });
+      document.body.appendChild(stepBanner);
+    }
+    stepBanner.innerHTML = `<span><b>DSP Sweeper is automatically changing this tab's date</b> to save sweeper history ` +
+      `(day ${st.done + 1} of ${st.total}: ${st.current}). Please don't use this tab until it returns to today.</span>` +
+      `<button data-act="cancel-step">Stop</button>`;
+  }
+
+  async function startStepping(days, force) {
+    await new Promise(r => setTimeout(r, Math.random() * 600));  // let one tab win if several are open
+    if (stepIsLive(await getStep())) return;
+    const dates = [];
+    for (let i = 1; i <= days; i++) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      const pad = x => String(x).padStart(2, '0');
+      dates.push(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
+    }
+    const stored = await new Promise(r => chrome.storage.local.get(dates.map(d => DSPHistory.KEY_PREFIX + d), r));
+    const queue = dates.filter(d => force || !stored[DSPHistory.KEY_PREFIX + d]?.complete);
+    if (!queue.length) {
+      await setStep({ running: false, done: 0, total: 0, failed: 0, finishedAt: Date.now() });
+      return;
+    }
+    const st = { running: true, owner: tabToken, queue, total: queue.length, done: 0, failed: 0,
+      current: queue[0], returnUrl: urlForDate(todayStr()) };
+    await setStep(st);
+    location.href = urlForDate(st.current);
+  }
+
+  // On every page load: if this tab is mid-run, wait for the expected date
+  async function resumeStepping() {
+    const st = await getStep();
+    if (st && !st.running && st.returnPending && st.owner === tabToken) {
+      // The run ended while this tab was moving to another date: go back to today
+      st.returnPending = false;
+      await setStep(st);
+      if (new URL(location.href).searchParams.get('selectedDay') !== new URL(st.returnUrl).searchParams.get('selectedDay')) location.href = st.returnUrl;
+      return;
+    }
+    if (!st || !st.running || st.owner !== tabToken) return;
+    stepCurrent = st.current;
+    const waitForBody = () => document.body ? showStepBanner(st) : setTimeout(waitForBody, 200);
+    waitForBody();
+    clearTimeout(stepTimer);
+    stepTimer = setTimeout(() => stepResult(false), STEP_TIMEOUT_MS);
+  }
+
+  function onStepDayLoaded(date) {
+    if (stepCurrent && date === stepCurrent) stepResult(true);
+  }
+
+  async function stepResult(ok) {
+    if (!stepCurrent) return;
+    stepCurrent = null;
+    clearTimeout(stepTimer);
+    const st = await getStep();
+    if (!st || !st.running || st.owner !== tabToken) return;
+    st.done++;
+    if (!ok) st.failed++;
+    st.queue.shift();
+    // If Cortex ignores the date in the address, don't keep trying
+    if (!ok && st.done === st.failed && st.failed >= 2) {
+      st.error = 'Cortex didn\'t switch to the requested dates';
+      return finishStepping(st);
+    }
+    if (st.cancel || !st.queue.length) return finishStepping(st);
+    st.current = st.queue[0];
+    await setStep(st);
+    setTimeout(async () => {
+      const now = await getStep();  // Stop may have been pressed during the pause
+      if (now && now.running && !now.cancel && now.owner === tabToken) location.href = urlForDate(now.current);
+    }, STEP_PAUSE_MS);
+  }
+
+  let stepFinishing = false;
+  async function finishStepping(st) {
+    if (stepFinishing) return;
+    stepFinishing = true;
+    stepCurrent = null;
+    clearTimeout(stepTimer);
+    Object.assign(st, { running: false, current: null, queue: [], finishedAt: Date.now(), returnPending: true });
+    await setStep(st);
+    if (stepBanner) stepBanner.textContent = 'DSP Sweeper automation finished. Returning this tab to today…';
+    setTimeout(() => { location.href = st.returnUrl; }, 1500);
+  }
+
+  // History page asks for a run by writing a request to storage
+  // (content scripts can't receive messages from extension pages directly).
+  const stepHandledSince = Date.now();
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local') return;
+    const req = changes[DSPHistory.STEP_REQUEST_KEY]?.newValue;
+    if (req && req.at > stepHandledSince && onRoutesPage()) startStepping(Math.min(+req.days || 30, 120), !!req.force);
+    const st = changes[STEP_KEY]?.newValue;
+    if (st && st.cancel && st.running && st.owner === tabToken) finishStepping(st);
+  });
 
   // transporterId → 'sweeper' | 'rescue' | 'pickup' from the current data
   function currentHelperTypes() {
