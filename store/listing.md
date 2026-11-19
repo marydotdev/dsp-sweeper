@@ -70,7 +70,7 @@ The screenshots use the extension's real history page, popup, and overlay styles
 
 - **Category:** Tools (unchanged)
 - **Language:** English (unchanged)
-- **Homepage URL:** the website's address, once `site/` is hosted
+- **Homepage URL:** `https://dsp-sweeper.vercel.app`
 
 ## 3. Privacy practices tab
 

@@ -13,7 +13,7 @@
 
   // TODO: set this to the instructions / more-info page once it exists.
   // While it's empty, the popup shows the link greyed out with "coming soon".
-  const HELP_URL = '';
+  const HELP_URL = 'https://dsp-sweeper.vercel.app';
 
   // Keep in sync with SWEEPER_COLORS in content.js
   const SWEEPER_COLORS = [
