@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DSP Sweeper — see every sweeper on the Cortex map</title>
+  <meta name="description" content="DSP Sweeper is a Chrome extension for Amazon delivery service partners. It colors your sweepers on the Cortex route map, tracks which route each one is helping, and keeps a daily history of rescues.">
+  <meta property="og:title" content="DSP Sweeper — see every sweeper on the Cortex map">
+  <meta property="og:description" content="Color your sweepers on the Cortex route map, track who they're helping, and keep a daily history of rescues.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav">
+    <a class="brand" href="#top" aria-label="DSP Sweeper home">
+      <img src="logo.png" alt="" width="34" height="34">
+      <span>DSP Sweeper</span>
+    </a>
+    <nav aria-label="Sections">
+      <a href="#features">Features</a>
+      <a href="#history">History</a>
+      <a href="#how">How it works</a>
+      <a href="#privacy">Privacy</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <a class="btn btn-primary btn-sm" data-install href="https://chromewebstore.google.com/detail/dsp-sweeper/ocediifeneikminnlchobcffjiiflebk" rel="noopener">Add to Chrome</a>
+  </header>
+
+  <main id="main">
+    <!-- ───────────── Hero ───────────── -->
+    <section class="hero" id="top">
+      <div class="hero-copy">
+        <p class="eyebrow">Chrome extension for Amazon DSP dispatchers</p>
+        <h1>Know where every <span class="swept">sweeper</span> is.</h1>
+        <p class="lede">DSP Sweeper adds a small toolbar to the Cortex routes page. It gives each sweeper their own color on the map, shows whose route they're helping right now, and keeps a record of every rescue.</p>
+        <div class="cta">
+          <a class="btn btn-primary" data-install href="https://chromewebstore.google.com/detail/dsp-sweeper/ocediifeneikminnlchobcffjiiflebk" rel="noopener">Add to Chrome</a>
+          <a class="btn btn-ghost" href="#how">How it works</a>
+        </div>
+        <p class="fine">Works on <code>logistics.amazon.com</code> with your normal Cortex sign-in. Not affiliated with Amazon.</p>
+      </div>
+
+      <div class="mock" aria-label="Interactive demo of the DSP Sweeper toolbar on a sample map">
+        <div class="mock-bar">
+          <i></i><i></i><i></i>
+          <span class="mock-url">logistics.amazon.com/operations/execution/dv/routes</span>
+        </div>
+        <div class="map" id="map">
+          <svg class="roads" viewBox="0 0 800 520" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+            <path class="water" d="M-20 380 C120 330 210 430 340 410 S560 470 820 400 V540 H-20Z"/>
+            <path class="park" d="M520 40 h170 a18 18 0 0 1 18 18 v90 a18 18 0 0 1 -18 18 h-170 a18 18 0 0 1 -18 -18 v-90 a18 18 0 0 1 18 -18z"/>
+            <g class="road-major">
+              <path d="M-20 150 C180 120 300 220 480 200 S700 260 820 230"/>
+              <path d="M260 -20 C240 140 330 260 300 540"/>
+              <path d="M-20 300 C200 320 420 280 820 330"/>
+            </g>
+            <g class="road-minor">
+              <path d="M90 -20 V540"/><path d="M430 -20 C440 160 400 300 450 540"/>
+              <path d="M600 -20 C620 200 580 320 640 540"/><path d="M730 -20 V540"/>
+              <path d="M-20 60 H820"/><path d="M-20 240 C220 250 520 230 820 270"/>
+              <path d="M150 150 L250 300"/><path d="M480 200 L600 300"/>
+            </g>
+          </svg>
+          <div id="pins"></div>
+          <div class="tip" id="tip" role="status"></div>
+
+          <div class="popover" id="popover" hidden></div>
+          <div class="toolbar" id="toolbar">
+            <button class="tb-ico" type="button" id="tb-reset" title="Reset demo" aria-label="Reset demo">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
+            </button>
+            <span class="tb-div"></span>
+            <div class="tb-dots" id="tb-dots"></div>
+            <button class="tb-btn" type="button" id="tb-add" aria-label="Show sweeper candidates">+<b id="tb-badge"></b></button>
+            <span class="tb-btn tb-clock" title="History" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            </span>
+          </div>
+        </div>
+        <p class="mock-note">Try it: click a colored dot, or press <b>+</b> to confirm a helper. Sample data.</p>
+      </div>
+    </section>
+
+    <!-- ───────────── Problem strip ───────────── -->
+    <section class="strip reveal">
+      <p>In Cortex, a sweeper is just another pin. Once they jump onto someone else's route, finding them means clicking through routes one by one. <strong>DSP Sweeper keeps them in view all day.</strong></p>
+    </section>
+
+    <!-- ───────────── Features ───────────── -->
+    <section class="section" id="features">
+      <header class="sec-head reveal">
+        <p class="eyebrow">On the routes page</p>
+        <h2>Everything a dispatcher checks, without the clicking.</h2>
+      </header>
+
+      <div class="features">
+        <article class="feat feat-wide reveal">
+          <div class="feat-art art-pins" aria-hidden="true">
+            <span style="--c:#3498DB"></span><span style="--c:#E91E90"></span><span style="--c:#2ECC71"></span><span style="--c:#9B59B6"></span><span class="dim"></span><span class="dim"></span><span class="dim"></span>
+          </div>
+          <h3>A color for every sweeper</h3>
+          <p>Each sweeper's map pin is recolored so you can pick them out at a glance. Colors stay unique, and they stick when you pan, zoom, or reload.</p>
+        </article>
+
+        <article class="feat reveal">
+          <div class="feat-art art-badge" aria-hidden="true"><span>+</span><b>3</b></div>
+          <h3>Finds helpers for you</h3>
+          <p>Routes with more than one transporter are flagged automatically. Confirm or dismiss each candidate with one click.</p>
+        </article>
+
+        <article class="feat reveal">
+          <div class="feat-art art-trail" aria-hidden="true">
+            <code>CX104</code><i></i><code>CX131</code><i></i><code class="on">CX118</code>
+          </div>
+          <h3>Follows them route to route</h3>
+          <p>See which route a sweeper is on now, how many stops they've done there, and everywhere they've been today.</p>
+        </article>
+
+        <article class="feat reveal">
+          <div class="feat-art art-tip" aria-hidden="true">
+            <div><b>Dana R.</b><span>On CX118 · Marcus T.</span><span>14 stops done</span></div>
+          </div>
+          <h3>Hover for the details</h3>
+          <p>Point at a colored pin to see the sweeper's name, current route, the driver they're helping, and stop progress.</p>
+        </article>
+
+        <article class="feat reveal">
+          <div class="feat-art art-swatch" aria-hidden="true">
+            <span style="--c:#9B59B6"></span><span style="--c:#3498DB"></span><span style="--c:#E91E90" class="pick"></span><span style="--c:#2ECC71"></span><span style="--c:#F39C12"></span><span style="--c:#1ABC9C"></span><span style="--c:#E74C3C"></span><span style="--c:#B0B8C4"></span>
+          </div>
+          <h3>Pick your own colors</h3>
+          <p>Choose a swatch for any sweeper. If someone else already has that color, the two swap so nobody shares one.</p>
+        </article>
+
+        <article class="feat feat-full reveal">
+          <div class="feat-art art-popup" aria-hidden="true">
+            <div class="mini-stat"><b>4</b><span>Sweepers</span></div>
+            <div class="mini-stat"><b>9</b><span>Routes helped</span></div>
+            <div class="mini-stat"><b>212</b><span>Stops done</span></div>
+          </div>
+          <div><h3>Today at a glance</h3>
+          <p>Click the broom in Chrome's toolbar for today's totals: confirmed sweepers, routes helped, stops done, and where each sweeper is right now.</p></div>
+        </article>
+      </div>
+    </section>
+
+    <!-- ───────────── History ───────────── -->
+    <section class="section section-dark" id="history">
+      <div class="split">
+        <div class="reveal">
+          <p class="eyebrow">Sweeper history</p>
+          <h2>Who got rescued, who did the rescuing, and how often.</h2>
+          <p>Every day you have the routes page open is saved automatically. Open the history page from the clock icon to look back across days and weeks.</p>
+          <ul class="ticks">
+            <li><b>By day</b> — each helper, the routes they helped on, whose route it was, and stops taken</li>
+            <li><b>Most rescued</b> — drivers ranked by how many days they needed help</li>
+            <li><b>Sweepers &amp; rescuers</b> — days worked and total stops for each person</li>
+            <li><b>Export CSV</b> — every assist in the range you select</li>
+          </ul>
+        </div>
+
+        <div class="hist reveal" aria-label="Sample of the history page">
+          <div class="tabs" role="tablist">
+            <button role="tab" aria-selected="true" data-tab="day">By day</button>
+            <button role="tab" aria-selected="false" data-tab="rescued">Most rescued</button>
+            <button role="tab" aria-selected="false" data-tab="people">Sweepers &amp; rescuers</button>
+            <span class="csv">Export CSV</span>
+          </div>
+          <div class="panel" data-panel="day">
+            <div class="day-h">Tue, Nov 17 <span>3 helpers · 6 assists</span></div>
+            <div class="hrow"><span class="kind k-sweeper">Sweeper</span><b>Dana R.</b><span class="r">CX118 Marcus T. · 14<br>CX131 Leo P. · 22</span></div>
+            <div class="hrow"><span class="kind k-sweeper">Sweeper</span><b>Priya K.</b><span class="r">CX104 Sam W. · 31<br>CX122 Marcus T. · 9</span></div>
+            <div class="hrow"><span class="kind k-rescue">Rescue</span><b>Jo A.</b><span class="r">CX109 Leo P. · 12</span></div>
+            <div class="hrow muted"><span class="kind k-pickup">Pickup</span><b>Theo M.</b><span class="r">CX140 Sam W. · 1</span></div>
+          </div>
+          <div class="panel" data-panel="rescued" hidden>
+            <div class="bar-row"><b>Marcus T.</b><i style="--w:100%"></i><span>5 days</span></div>
+            <div class="bar-row"><b>Leo P.</b><i style="--w:80%"></i><span>4 days</span></div>
+            <div class="bar-row"><b>Sam W.</b><i style="--w:40%"></i><span>2 days</span></div>
+            <div class="bar-row"><b>Ana G.</b><i style="--w:20%"></i><span>1 day</span></div>
+          </div>
+          <div class="panel" data-panel="people" hidden>
+            <div class="prow head"><span>Name</span><span>Sweeper</span><span>Rescue</span><span>Stops</span></div>
+            <div class="prow"><b>Dana R.</b><span>6 days</span><span>—</span><span>248</span></div>
+            <div class="prow"><b>Priya K.</b><span>5 days</span><span>1 day</span><span>203</span></div>
+            <div class="prow"><b>Jo A.</b><span>—</span><span>3 days</span><span>41</span></div>
+          </div>
+          <p class="hist-note">Sample data</p>
+        </div>
+      </div>
+
+      <div class="types reveal">
+        <h3>Helpers are sorted into three types automatically</h3>
+        <div class="type-grid">
+          <div><span class="kind k-sweeper">Sweeper</span><p>Has no route of their own and helps other drivers.</p></div>
+          <div><span class="kind k-rescue">Rescue</span><p>Has their own route of 20+ stops and also helped another driver.</p></div>
+          <div><span class="kind k-pickup">Pickup</span><p>Took only 1–2 stops in total, usually a package marked missing. Never counted as a rescue.</p></div>
+        </div>
+        <p class="types-note">Got one wrong? Change it from the dropdown next to the helper's name. The change applies to that day only.</p>
+      </div>
+    </section>
+
+    <!-- ───────────── How it works ───────────── -->
+    <section class="section" id="how">
+      <header class="sec-head reveal">
+        <p class="eyebrow">How it works</p>
+        <h2>Set up in about a minute.</h2>
+      </header>
+      <ol class="steps">
+        <li class="reveal"><span class="num">1</span><h3>Install the extension</h3><p>Add DSP Sweeper to Chrome. There's no account to create and nothing to configure.</p></li>
+        <li class="reveal"><span class="num">2</span><h3>Open the Cortex routes page</h3><p>Sign in to Cortex and open the routes page, <code>/operations/execution/dv/routes</code>. The toolbar appears at the bottom-right of the screen.</p></li>
+        <li class="reveal"><span class="num">3</span><h3>Confirm your sweepers</h3><p>The <b>+</b> button shows a count when helpers are detected. Confirm each one and their pin takes on a color.</p></li>
+      </ol>
+
+      <div class="guide">
+        <article class="reveal">
+          <h3>Using the toolbar</h3>
+          <dl>
+            <dt>Colored dots</dt><dd>Click a dot to open that sweeper's detail panel: current route and today's history.</dd>
+            <dt>Changing a color</dt><dd>In the detail panel, click the dot beside the sweeper's name, then pick a swatch.</dd>
+            <dt>Clock icon</dt><dd>Opens the history page in a new tab.</dd>
+            <dt>Reset icon</dt><dd>Clears today's sweeper list. History isn't affected. The list also resets itself at midnight, your computer's local time.</dd>
+          </dl>
+        </article>
+
+        <article class="reveal" id="past-days">
+          <h3>Adding past days to history</h3>
+          <p>Today is saved while the routes page is open. For earlier days there are two ways, and both save the same data.</p>
+          <div class="ways">
+            <div>
+              <h4>Manually</h4>
+              <p>Use Cortex's own date picker to open an earlier day and wait for the routes to load. The day appears on the history page within a second or two. Switch back to today when you're done.</p>
+            </div>
+            <div>
+              <h4>Automatically</h4>
+              <p>On the history page, choose a range and click <b>Load automatically…</b>. The extension steps your open Cortex tab through each missing day, about 10 seconds a day, then returns it to today. It only runs when you start it, and you can stop it at any time.</p>
+            </div>
+          </div>
+          <p class="caution"><b>Before you use the automatic option:</b> it changes dates in your Cortex tab for you, using your sign-in. Automated use of your account may be limited by Amazon's terms, so check that it fits your DSP's rules. If in doubt, use the manual way.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ───────────── Privacy ───────────── -->
+    <section class="section section-tint" id="privacy">
+      <header class="sec-head reveal">
+        <p class="eyebrow">Privacy &amp; permissions</p>
+        <h2>Your route data stays in your browser.</h2>
+      </header>
+      <div class="privacy">
+        <div class="reveal">
+          <h3>Nothing is sent anywhere</h3>
+          <p>Sweeper lists and history are stored in Chrome on your computer. The extension has no server and makes no network requests of its own.</p>
+        </div>
+        <div class="reveal">
+          <h3>It only reads what Cortex shows you</h3>
+          <p>DSP Sweeper never calls Cortex's API. It saves the route data Cortex has already loaded in your tab, and it doesn't change anything in Cortex.</p>
+        </div>
+        <div class="reveal">
+          <h3>Three permissions</h3>
+          <ul class="perms">
+            <li><code>storage</code> Keeps your sweepers across page refreshes</li>
+            <li><code>unlimitedStorage</code> Holds months of daily history</li>
+            <li><code>activeTab</code> Reads the current tab's address when you open the summary panel</li>
+          </ul>
+          <p class="small">It runs only on <code>logistics.amazon.com</code>, and the toolbar only appears on the routes page.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ───────────── FAQ ───────────── -->
+    <section class="section" id="faq">
+      <header class="sec-head reveal">
+        <p class="eyebrow">Questions</p>
+        <h2>Good to know.</h2>
+      </header>
+      <div class="faq reveal">
+        <details>
+          <summary>Is DSP Sweeper made by Amazon?</summary>
+          <p>No. It's an independent tool and isn't affiliated with or endorsed by Amazon. You need your own Cortex access to use it.</p>
+        </details>
+        <details>
+          <summary>Does it change anything in Cortex?</summary>
+          <p>No. It's a visual layer on top of the routes page: it recolors pins on your screen and adds a toolbar. Routes, assignments, and stops are untouched.</p>
+        </details>
+        <details>
+          <summary>The toolbar isn't showing. What should I check?</summary>
+          <p>Make sure you're on the routes page (<code>/operations/execution/dv/routes</code>), then reload the tab. If you hid the overlay, click the broom icon in Chrome's toolbar and choose <b>Show overlay</b>.</p>
+        </details>
+        <details>
+          <summary>What happens to my sweeper list overnight?</summary>
+          <p>Today's list clears at midnight, your computer's local time, even in a tab left open. History is kept.</p>
+        </details>
+        <details>
+          <summary>How far back can history go?</summary>
+          <p>As far back as Cortex still has route data for.</p>
+        </details>
+        <details>
+          <summary>Does everyone on my team see the same sweepers?</summary>
+          <p>No. Data is stored per browser, so each dispatcher confirms sweepers on their own computer.</p>
+        </details>
+        <details>
+          <summary>Which browsers does it work in?</summary>
+          <p>Google Chrome on a desktop or laptop.</p>
+        </details>
+      </div>
+    </section>
+
+    <!-- ───────────── Install ───────────── -->
+    <section class="install" id="install">
+      <img src="logo.png" alt="" width="84" height="84" class="bob">
+      <h2>Stop hunting for your sweepers.</h2>
+      <p>Add DSP Sweeper to Chrome and open the Cortex routes page.</p>
+      <div class="cta">
+        <a class="btn btn-primary" data-install href="https://chromewebstore.google.com/detail/dsp-sweeper/ocediifeneikminnlchobcffjiiflebk" rel="noopener">Add to Chrome</a>
+        <a class="btn btn-dark" href="https://github.com/marydotdev/dsp-sweeper" rel="noopener">View on GitHub</a>
+      </div>
+      <details class="dev">
+        <summary>Install from source instead</summary>
+        <ol>
+          <li>Download or clone the project folder.</li>
+          <li>Open <code>chrome://extensions</code> and turn on <b>Developer mode</b>.</li>
+          <li>Click <b>Load unpacked</b> and select the folder.</li>
+          <li>Open the Cortex routes page. Reload it if it was already open.</li>
+        </ol>
+      </details>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <a class="brand" href="#top"><img src="logo.png" alt="" width="26" height="26"><span>DSP Sweeper</span></a>
+    <p>An independent tool for delivery service partners. Not affiliated with, endorsed by, or sponsored by Amazon. Amazon and Cortex are trademarks of their owner.</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
